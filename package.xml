@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+  <name>Drill Tube Workbench</name>
+  <description>Generates tubes sized to bundle a chosen number of drill bits, with stub/jobber/long length presets.</description>
+  <version>0.1.0</version>
+  <date>2026-11-10</date>
+  <maintainer email="you@example.com">Your Name</maintainer>
+  <license>Your License</license>
+  <url type="repository" branch="main">https://example.com/your-repo.git</url>
+  <icon>freecad/drilltube_workbench/icons/DrillTubeWorkbench.svg</icon>
+  <content>
+    <workbench>
+      <classname>DrillTubeWorkbench</classname>
+      <subdirectory>./</subdirectory>
+    </workbench>
+  </content>
+</package>
