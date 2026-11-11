@@ -1,5 +1,7 @@
 # Drill Tube Workbench
 
+** Disclaimer: This is a verified but still Vibe Coded workbench ** 
+
 A FreeCAD workbench that generates a closed-bottom tube with a screw-on cap,
 sized to bundle a chosen number of same-size drill bits together in
 cross-section — like the plastic sleeve a multi-pack of bits comes in, but
