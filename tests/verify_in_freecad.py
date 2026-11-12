@@ -16,7 +16,10 @@ sys.stdout.reconfigure(line_buffering=True)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import math
+
 import FreeCAD
+import Part
 
 from freecad.drilltube_workbench import drill_lengths, drill_sizes, feature, packing
 
@@ -30,6 +33,12 @@ CASES = [
          category=drill_lengths.CATEGORY_LONG),
     dict(system=drill_sizes.SYSTEM_LETTER, label="Q",
          diameter_mm=drill_sizes.resolve_diameter_mm(drill_sizes.SYSTEM_LETTER, "Q"), count=1,
+         category=drill_lengths.CATEGORY_JOBBER),
+    # Regression case: #29 x12 printed with no visible/printed cap threads and a loose
+    # fit on a real printer (Bambu H2S) -- traced to the cap's plain bore being cut at
+    # the thread's crest radius instead of its root, making the groove cut a near no-op.
+    dict(system=drill_sizes.SYSTEM_NUMBER, label="#29",
+         diameter_mm=drill_sizes.resolve_diameter_mm(drill_sizes.SYSTEM_NUMBER, "#29"), count=12,
          category=drill_lengths.CATEGORY_JOBBER),
 ]
 
@@ -59,21 +68,50 @@ for case in CASES:
 
     tube_bbox = tube.Shape.BoundBox
     expected_tube_h = tube.BottomThickness.Value + tube.Length.Value
-    if abs(tube_bbox.ZLength - expected_tube_h) > 1e-2:
-        failures.append("{} tube: bbox Z length {:.3f} != expected {:.3f}".format(
-            name, tube_bbox.ZLength, expected_tube_h))
+    # The thread's own end tooth legitimately pokes past the nominal top by roughly
+    # half its axial width (same as a real screw's first/last partial thread) -- allow
+    # a generous margin for that rather than requiring an exact match.
+    max_protrusion = 2.5
+    if not (0 <= tube_bbox.ZLength - expected_tube_h <= max_protrusion):
+        failures.append("{} tube: bbox Z length {:.3f} not within [{:.3f}, {:.3f}] of expected {:.3f}".format(
+            name, tube_bbox.ZLength, expected_tube_h, expected_tube_h + max_protrusion, expected_tube_h))
 
     if tube.BoreDiameter.Value <= 0 or tube.BoreDiameter.Value >= tube.OuterDiameter.Value:
         failures.append("{} tube: bore diameter {:.3f} not sane vs outer {:.3f}".format(
             name, tube.BoreDiameter.Value, tube.OuterDiameter.Value))
 
-    # Cap bore must clear the tube's thread crest (NeckRadius + ThreadHeight) by ThreadClearance.
-    thread_crest = tube.NeckRadius.Value + tube.ThreadHeight.Value
-    expected_cap_bore_r = thread_crest + cap.ThreadClearance.Value
-    actual_cap_bore_r = cap.BoreDiameter.Value / 2.0
-    if abs(actual_cap_bore_r - expected_cap_bore_r) > 1e-6:
-        failures.append("{} cap: bore radius {:.4f} != expected clearance-fit radius {:.4f}".format(
-            name, actual_cap_bore_r, expected_cap_bore_r))
+    # The cap's plain bore (before the groove is cut) must stop at the thread's ROOT
+    # (NeckRadius + ThreadClearance), not its crest -- a bore cut to the crest already
+    # removes all the material the groove cut is supposed to carve out, which is exactly
+    # the bug behind the #29 x12 regression case above (no real cap threads, loose fit).
+    expected_root_r = tube.NeckRadius.Value + cap.ThreadClearance.Value
+    actual_root_r = cap.BoreDiameter.Value / 2.0
+    if abs(actual_root_r - expected_root_r) > 1e-6:
+        failures.append("{} cap: plain-bore radius {:.4f} != expected thread-root radius {:.4f}".format(
+            name, actual_root_r, expected_root_r))
+
+    # The groove cut must remove a *substantial* fraction of the root-to-crest shell --
+    # not ~0% (the original bug: bore already at the crest, groove cut was a no-op) and
+    # not ~100% (would mean no actual thread "fingers" survive to mesh with the tube).
+    crest_r = expected_root_r + cap.ThreadHeight.Value
+    shell_volume = math.pi * (crest_r ** 2 - actual_root_r ** 2) * cap.ThreadLength.Value
+    plain_cup = Part.makeCylinder(cap.OuterDiameter.Value / 2.0, cap.ThreadLength.Value + cap.TopThickness.Value)
+    plain_cup = plain_cup.cut(Part.makeCylinder(actual_root_r, cap.ThreadLength.Value))
+    # Rebuild the cap's own shape without the label, to isolate the groove's effect cleanly
+    # from the (separately-checked) label engraving.
+    original_label = cap.SizeLabel
+    cap.SizeLabel = ""
+    doc.recompute()
+    groove_removed = plain_cup.Volume - cap.Shape.Volume
+    cap.SizeLabel = original_label
+    doc.recompute()
+    removed_fraction = groove_removed / shell_volume if shell_volume > 0 else 0
+    if not (0.15 <= removed_fraction <= 0.9):
+        failures.append(
+            "{} cap: thread groove removed {:.1f}% of the root-to-crest shell volume "
+            "({:.2f} of {:.2f} mm3) -- expected roughly 15-90%, got something that smells "
+            "like a no-op cut or a fully-cleared shell".format(
+                name, removed_fraction * 100, groove_removed, shell_volume))
 
     # The engraved label must have actually removed material from the cap.
     cap_label_cleared = cap.SizeLabel == case["label"]

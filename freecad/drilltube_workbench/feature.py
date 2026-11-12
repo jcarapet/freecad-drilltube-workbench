@@ -148,13 +148,8 @@ class DrillTube:
         bore.translate(FreeCAD.Vector(0, 0, bottom))
         cut = blank.cut(bore)
 
-        # Embed the ridge's base slightly into the neck rather than leaving it exactly
-        # tangent to the neck's surface: fusing two shapes that only touch (zero volumetric
-        # overlap) is an OCC degenerate case that produces an invalid "wire imbrication" for
-        # some tube sizes. Growing thread_height by the same amount keeps the crest flush
-        # with OuterDiameter as designed.
-        ridge = thread.make_thread_ridge(neck_r - thread.EMBED_MM, obj.ThreadPitch.Value, thread_length,
-                                          thread_height + thread.EMBED_MM, z0=body_h)
+        ridge = thread.make_thread_ridge(neck_r, obj.ThreadPitch.Value, thread_length,
+                                          thread_height, z0=body_h)
         obj.Shape = cut.fuse(ridge)
 
 
@@ -187,7 +182,8 @@ class DrillTubeCap:
         obj.addProperty("App::PropertyLength", "LabelDepth", "DrillTubeCap",
                          "How deep the label is engraved").LabelDepth = 0.6
         obj.addProperty("App::PropertyLength", "BoreDiameter", "DrillTubeCap",
-                         "Computed inner bore diameter (clears the tube's thread crest)")
+                         "Computed plain-bore diameter before the thread groove is cut "
+                         "-- sized to the thread's root (minor) diameter, not its crest")
         obj.setEditorMode("BoreDiameter", 1)  # read-only
         obj.addProperty("App::PropertyLength", "OuterDiameter", "DrillTubeCap",
                          "Computed outer cap diameter")
@@ -199,9 +195,15 @@ class DrillTubeCap:
             self._add_properties(obj)
 
     def _recompute_derived(self, obj):
-        bore = 2 * (obj.NeckRadius.Value + obj.ThreadHeight.Value + obj.ThreadClearance.Value)
-        obj.BoreDiameter = bore
-        obj.OuterDiameter = bore + 2 * obj.CapWallThickness.Value
+        # The plain bore (cut before the thread groove) must stop at the thread's ROOT,
+        # not its crest -- a bore cut all the way to the crest would already remove all
+        # the material the groove cut is supposed to carve, leaving no actual threads
+        # (and a cap that fits loose by roughly the full thread height instead of the
+        # intended ThreadClearance -- exactly what happened on the first real print).
+        root_r = obj.NeckRadius.Value + obj.ThreadClearance.Value
+        crest_r = root_r + obj.ThreadHeight.Value
+        obj.BoreDiameter = 2 * root_r
+        obj.OuterDiameter = 2 * crest_r + 2 * obj.CapWallThickness.Value
 
     def onChanged(self, obj, prop):
         if prop in ("NeckRadius", "ThreadHeight", "ThreadClearance", "CapWallThickness"):

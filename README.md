@@ -35,12 +35,14 @@ printing.
   The tube's actual printed height is `Length + BottomThickness`, since the
   bottom is solid (see below) — the bit's full length still fits in the
   cavity either way.
-- **Thread**: a single-start, coarse trapezoidal thread (see
-  [FDM printing notes](#fdm-printing-notes)) on a reduced-diameter "neck" at
-  the top of the tube, flush with the tube's outer diameter at the thread
-  crest. The cap has a matching thread groove cut into its bore, offset
-  radially by `ThreadClearance` for a printable fit, plus the bit size
-  engraved into its top face.
+- **Thread**: a single-start thread with a true 60-degree included flank
+  angle (matching the defining angle of ISO 68-1/724 metric threads — see
+  [FDM printing notes](#fdm-printing-notes) for why it isn't ISO-exact
+  beyond that) on a reduced-diameter "neck" at the top of the tube, flush
+  with the tube's outer diameter at the thread crest. The cap has a
+  matching thread groove cut into its bore, offset radially by
+  `ThreadClearance` for a printable fit, plus the bit size engraved into
+  its top face.
 
 ### Important caveat on the length table
 
@@ -64,14 +66,31 @@ caliper or your own chart before cutting metal, as general good practice.
 
 ## FDM printing notes
 
-**Thread design.** The tube/cap thread is a coarse, single-start trapezoidal
-profile (pitch 3 mm by default, `ThreadLength`/`ThreadPitch`/`ThreadHeight`
-properties on the tube) rather than a fine ISO metric thread — fine threads
-are notoriously unreliable straight off an FDM printer. `ThreadClearance`
-(on the cap, default 0.3 mm radial) is the knob to loosen or tighten the fit:
-how tight a given clearance prints depends on your printer, nozzle, and
-filament, so **print one small test tube+cap pair first** and adjust
+**Thread design.** The tube/cap thread is a single-start thread with a true
+60-degree included flank angle (pitch 3 mm by default —
+`ThreadLength`/`ThreadPitch`/`ThreadHeight` properties on the tube) rather
+than a fine ISO metric thread — fine threads are notoriously unreliable
+straight off an FDM printer. It is not a hairline-exact ISO 724 profile,
+though: the crest/root flat is explicitly held to at least 0.4 mm (roughly
+one 0.4 mm nozzle line) rather than ISO's much thinner standard truncation,
+since a geometrically "correct" ISO crest is thinner than a single nozzle
+line and won't print consistently — that gap between "correct on screen"
+and "actually extrudes" is what produced paper-thin, inconsistent threads
+on a real print in an earlier version of this profile. `ThreadClearance`
+(on the cap, default 0.3 mm radial) is the knob to loosen or tighten the
+fit: how tight a given clearance prints depends on your printer, nozzle,
+and filament, so **print one small test tube+cap pair first** and adjust
 `ThreadClearance` before generating a whole batch.
+
+The thread ridge is built as a stepped loft between many small rotated
+copies of the tooth profile (24 per full turn), not a single smooth sweep —
+this is slower (tube+cap generation takes on the order of 10 seconds rather
+than being instant) but far more robust; a single swept profile was found to
+silently produce a much thinner real thread than it appeared to in the 3D
+view. If generation feels too slow for your use (e.g. batch-generating many
+tubes), `STEPS_PER_TURN` in `freecad/drilltube_workbench/thread.py` is a
+simple constant you can lower at some cost to how smooth/round the thread
+looks.
 
 **Print orientation.**
 - The tube prints **closed-bottom-down**: the solid base sits flat on the
