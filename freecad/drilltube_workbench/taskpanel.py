@@ -122,6 +122,26 @@ class DrillTubeTaskPanel:
         self.cap_top_thickness.setValue(3.0)
         layout.addRow("Cap top thickness", self.cap_top_thickness)
 
+        self.knurl_enabled = QtGui.QCheckBox("Add knurling to cap")
+        self.knurl_enabled.setChecked(True)
+        layout.addRow("", self.knurl_enabled)
+
+        self.knurl_pitch = QtGui.QDoubleSpinBox()
+        self.knurl_pitch.setDecimals(2)
+        self.knurl_pitch.setRange(1.0, 10.0)
+        self.knurl_pitch.setSuffix(" mm")
+        self.knurl_pitch.setValue(2.5)
+        self.knurl_enabled.toggled.connect(self.knurl_pitch.setEnabled)
+        layout.addRow("Knurl pitch", self.knurl_pitch)
+
+        self.knurl_depth = QtGui.QDoubleSpinBox()
+        self.knurl_depth.setDecimals(2)
+        self.knurl_depth.setRange(0.1, 2.0)
+        self.knurl_depth.setSuffix(" mm")
+        self.knurl_depth.setValue(0.5)
+        self.knurl_enabled.toggled.connect(self.knurl_depth.setEnabled)
+        layout.addRow("Knurl depth", self.knurl_depth)
+
         self.preview_label = QtGui.QLabel()
         layout.addRow("Preview", self.preview_label)
 
@@ -212,6 +232,9 @@ class DrillTubeTaskPanel:
             thread_clearance_mm=self.thread_clearance.value(),
             cap_wall_thickness_mm=self.cap_wall_thickness.value(),
             cap_top_thickness_mm=self.cap_top_thickness.value(),
+            knurl_enabled=self.knurl_enabled.isChecked(),
+            knurl_pitch_mm=self.knurl_pitch.value(),
+            knurl_depth_mm=self.knurl_depth.value(),
         )
 
     def accept(self):

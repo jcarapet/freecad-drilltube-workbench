@@ -43,6 +43,12 @@ printing.
   matching thread groove cut into its bore, offset radially by
   `ThreadClearance` for a printable fit, plus the bit size engraved into
   its top face.
+- **Knurling**: straight (axial) ridges around the cap's full outer
+  surface for grip, evenly spaced to land close to `KnurlPitch` apart
+  (`KnurlCount` is computed from that and the cap's diameter) and
+  protruding `KnurlDepth` radially. Unlike the thread, these run straight
+  along the axis rather than helically, so each one is a simple vertical
+  prism — no sweep involved. Toggle with `KnurlEnabled`.
 
 ### Important caveat on the length table
 
@@ -100,6 +106,14 @@ looks.
   detail) without hurting the thread's printability — flipping which face
   touches the bed doesn't change the thread helix's own overhang
   characteristics, only which surface gets the bed's finish.
+
+**Knurling.** The grip ridges are perfectly vertical extrusions with no
+axial variation at all, so they're about the easiest geometry on the whole
+model to print — no overhangs, no supports, regardless of print
+orientation. The default 0.5 mm depth / 2.5 mm pitch is a reasonable
+balance of grip vs. print time; a shallower depth (e.g. 0.3 mm) prints a
+bit faster and still gives noticeable grip if you'd rather minimize extra
+perimeter travel.
 
 **Minimum wall thickness.** `WallThickness`, `BottomThickness`,
 `CapWallThickness`, and `TopThickness` default to values at or above ~1.2 mm
@@ -164,6 +178,8 @@ Before publishing/distributing, fill in your own details in `package.xml`
      [FDM printing notes](#fdm-printing-notes) for sane defaults.
    - **Cap wall thickness / top thickness**: the cap's skirt wall and the
      solid disc on top that carries the engraved label.
+   - **Add knurling to cap** / **Knurl pitch** / **Knurl depth**: straight
+     grip ridges around the cap. Uncheck the box for a smooth cap.
    - The **Preview** line updates live with the resulting bore/outer
      diameter and length.
 4. Click **OK** to create the tube and its matching cap (grouped together

@@ -22,6 +22,7 @@ import Part
 
 from . import drill_lengths
 from . import drill_sizes
+from . import knurl
 from . import packing
 from . import text_label
 from . import thread
@@ -181,6 +182,12 @@ class DrillTubeCap:
         obj.FontFile = text_label.find_default_font()
         obj.addProperty("App::PropertyLength", "LabelDepth", "DrillTubeCap",
                          "How deep the label is engraved").LabelDepth = 0.6
+        obj.addProperty("App::PropertyBool", "KnurlEnabled", "DrillTubeCap",
+                         "Add straight (axial) knurling ridges for grip").KnurlEnabled = True
+        obj.addProperty("App::PropertyLength", "KnurlPitch", "DrillTubeCap",
+                         "Approximate spacing between knurl ridges").KnurlPitch = 2.5
+        obj.addProperty("App::PropertyLength", "KnurlDepth", "DrillTubeCap",
+                         "Radial height of each knurl ridge").KnurlDepth = 0.5
         obj.addProperty("App::PropertyLength", "BoreDiameter", "DrillTubeCap",
                          "Computed plain-bore diameter before the thread groove is cut "
                          "-- sized to the thread's root (minor) diameter, not its crest")
@@ -188,6 +195,9 @@ class DrillTubeCap:
         obj.addProperty("App::PropertyLength", "OuterDiameter", "DrillTubeCap",
                          "Computed outer cap diameter")
         obj.setEditorMode("OuterDiameter", 1)  # read-only
+        obj.addProperty("App::PropertyInteger", "KnurlCount", "DrillTubeCap",
+                         "Computed number of knurl ridges around the circumference")
+        obj.setEditorMode("KnurlCount", 1)  # read-only
         self._recompute_derived(obj)
 
     def onDocumentRestored(self, obj):
@@ -204,9 +214,11 @@ class DrillTubeCap:
         crest_r = root_r + obj.ThreadHeight.Value
         obj.BoreDiameter = 2 * root_r
         obj.OuterDiameter = 2 * crest_r + 2 * obj.CapWallThickness.Value
+        if hasattr(obj, "KnurlCount"):
+            obj.KnurlCount = knurl.ridge_count(obj.OuterDiameter.Value / 2.0, obj.KnurlPitch.Value)
 
     def onChanged(self, obj, prop):
-        if prop in ("NeckRadius", "ThreadHeight", "ThreadClearance", "CapWallThickness"):
+        if prop in ("NeckRadius", "ThreadHeight", "ThreadClearance", "CapWallThickness", "KnurlPitch"):
             if hasattr(obj, "OuterDiameter"):
                 self._recompute_derived(obj)
 
@@ -231,6 +243,11 @@ class DrillTubeCap:
                                            obj.ThreadPitch.Value, thread_length,
                                            obj.ThreadHeight.Value, z0=0.0)
         shape = body.cut(groove)
+
+        if obj.KnurlEnabled:
+            ridges = knurl.make_knurl_ridges(cap_outer_r, cap_h, obj.KnurlPitch.Value,
+                                              obj.KnurlDepth.Value, z0=0.0)
+            shape = shape.fuse(ridges)
 
         if obj.SizeLabel:
             max_width = cap_outer_r * 2 * 0.8
@@ -269,7 +286,8 @@ def make_drill_tube(doc, bit_diameter_mm, bit_count, size_system=drill_sizes.SYS
                      wall_thickness_mm=1.5, bit_clearance_mm=0.3, length_mm=None,
                      bottom_thickness_mm=2.0, thread_length_mm=10.0, thread_pitch_mm=3.0,
                      thread_height_mm=1.0, thread_clearance_mm=0.3, cap_wall_thickness_mm=2.0,
-                     cap_top_thickness_mm=3.0):
+                     cap_top_thickness_mm=3.0, knurl_enabled=True, knurl_pitch_mm=2.5,
+                     knurl_depth_mm=0.5):
     """Create and recompute a DrillTube + matching DrillTubeCap, grouped together."""
     tube = doc.addObject("Part::FeaturePython", "DrillTube")
     DrillTube(tube)
@@ -306,6 +324,9 @@ def make_drill_tube(doc, bit_diameter_mm, bit_count, size_system=drill_sizes.SYS
     cap.ThreadClearance = thread_clearance_mm
     cap.CapWallThickness = cap_wall_thickness_mm
     cap.TopThickness = cap_top_thickness_mm
+    cap.KnurlEnabled = knurl_enabled
+    cap.KnurlPitch = knurl_pitch_mm
+    cap.KnurlDepth = knurl_depth_mm
     cap.SizeLabel = size_label
 
     doc.recompute()

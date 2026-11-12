@@ -97,13 +97,18 @@ for case in CASES:
     shell_volume = math.pi * (crest_r ** 2 - actual_root_r ** 2) * cap.ThreadLength.Value
     plain_cup = Part.makeCylinder(cap.OuterDiameter.Value / 2.0, cap.ThreadLength.Value + cap.TopThickness.Value)
     plain_cup = plain_cup.cut(Part.makeCylinder(actual_root_r, cap.ThreadLength.Value))
-    # Rebuild the cap's own shape without the label, to isolate the groove's effect cleanly
-    # from the (separately-checked) label engraving.
+    # Rebuild the cap's own shape without the label or knurling, to isolate the groove's
+    # effect cleanly from those separately-checked features (knurling in particular adds
+    # material on top of `plain_cup`'s own baseline, which would otherwise make the groove
+    # look like it removed far less than it actually did).
     original_label = cap.SizeLabel
+    original_knurl = cap.KnurlEnabled
     cap.SizeLabel = ""
+    cap.KnurlEnabled = False
     doc.recompute()
     groove_removed = plain_cup.Volume - cap.Shape.Volume
     cap.SizeLabel = original_label
+    cap.KnurlEnabled = original_knurl
     doc.recompute()
     removed_fraction = groove_removed / shell_volume if shell_volume > 0 else 0
     if not (0.15 <= removed_fraction <= 0.9):
@@ -112,6 +117,39 @@ for case in CASES:
             "({:.2f} of {:.2f} mm3) -- expected roughly 15-90%, got something that smells "
             "like a no-op cut or a fully-cleared shell".format(
                 name, removed_fraction * 100, groove_removed, shell_volume))
+
+    # Knurling must actually add material and stay correctly bounded -- the latter
+    # specifically guards against the kind of "looks fine, isValid()==True, but the real
+    # geometry ballooned/smeared" bug the helical thread profile had before being rewritten.
+    # Use XLength/YLength (extent), not XMin/XMax directly -- cap.Shape.BoundBox reflects
+    # the cap's own Placement (it's laid out beside the tube for printing), so absolute
+    # coordinates are offset from the origin; the *size* of the bbox is translation-invariant.
+    cap_bbox = cap.Shape.BoundBox
+    expected_knurled_diameter = cap.OuterDiameter.Value + 2 * cap.KnurlDepth.Value
+    max_extent = max(cap_bbox.XLength, cap_bbox.YLength)
+    if cap.KnurlEnabled and not (expected_knurled_diameter - 1.0 <= max_extent <= expected_knurled_diameter + 1.0):
+        failures.append(
+            "{} cap: knurled bbox extent {:.3f} not within 1mm of expected diameter {:.3f} "
+            "(KnurlDepth={:.2f}) -- geometry may have ballooned".format(
+                name, max_extent, expected_knurled_diameter, cap.KnurlDepth.Value))
+
+    unknurled = doc.addObject("Part::FeaturePython", "DrillTubeCapUnknurled")
+    feature.DrillTubeCap(unknurled)
+    for prop in ("NeckRadius", "ThreadLength", "ThreadPitch", "ThreadHeight",
+                 "ThreadClearance", "CapWallThickness", "TopThickness"):
+        setattr(unknurled, prop, getattr(cap, prop).Value)
+    unknurled.KnurlEnabled = False
+    unknurled.SizeLabel = ""
+    doc.recompute()
+    original_label2 = cap.SizeLabel
+    cap.SizeLabel = ""
+    doc.recompute()
+    if cap.KnurlEnabled and cap.Shape.Volume <= unknurled.Shape.Volume:
+        failures.append("{} cap: knurled volume {:.2f} not greater than unknurled volume {:.2f} "
+                         "(knurling had no effect)".format(name, cap.Shape.Volume, unknurled.Shape.Volume))
+    cap.SizeLabel = original_label2
+    doc.recompute()
+    doc.removeObject(unknurled.Name)
 
     # The engraved label must have actually removed material from the cap.
     cap_label_cleared = cap.SizeLabel == case["label"]
