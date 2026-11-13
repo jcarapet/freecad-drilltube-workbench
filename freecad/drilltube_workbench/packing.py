@@ -45,9 +45,13 @@ def enclosing_diameter_ratio(count):
         raise ValueError("count must be >= 1")
     if count in _ENCLOSING_RATIO:
         return _ENCLOSING_RATIO[count]
-    # Asymptotic estimate for large N, with a margin since the asymptote
+    # Asymptotic estimate for large N: packing density rho = N*(r/R)^2 as N -> infinity,
+    # so R/r -> sqrt(N/rho). (An earlier version of this line had a spurious factor of 2
+    # here, roughly doubling the enclosing diameter for every count >= 20 -- the table only
+    # covers 1..19, so that bug affected every count above the table with no warning.)
+    # The _LARGE_N_MARGIN factor is a small safety margin since the asymptote slightly
     # underestimates the enclosing radius at finite N.
-    ratio = 2 * math.sqrt(count / _HEX_PACKING_DENSITY) * _LARGE_N_MARGIN
+    ratio = math.sqrt(count / _HEX_PACKING_DENSITY) * _LARGE_N_MARGIN
     # Never return less than the largest tabulated ratio's growth trend.
     return max(ratio, _ENCLOSING_RATIO[19] * math.sqrt(count / 19))
 

@@ -40,6 +40,15 @@ CASES = [
     dict(system=drill_sizes.SYSTEM_NUMBER, label="#29",
          diameter_mm=drill_sizes.resolve_diameter_mm(drill_sizes.SYSTEM_NUMBER, "#29"), count=12,
          category=drill_lengths.CATEGORY_JOBBER),
+    # Regression case: bit counts >= 20 fall outside packing.py's hand-tabulated ratios
+    # (1..19) and used an asymptotic formula with a spurious factor of 2, producing a
+    # bore diameter roughly double what it should have been -- reported as "diameter at
+    # 20 bits is significantly larger than at 19". This confirms the full tube+cap
+    # pipeline still builds correctly at a count past that boundary, on top of
+    # test_packing.py's direct check of the corrected formula itself.
+    dict(system=drill_sizes.SYSTEM_NUMBER, label="#4",
+         diameter_mm=drill_sizes.resolve_diameter_mm(drill_sizes.SYSTEM_NUMBER, "#4"), count=20,
+         category=drill_lengths.CATEGORY_JOBBER),
 ]
 
 failures = []

@@ -26,6 +26,30 @@ class TestPacking(unittest.TestCase):
         self.assertGreater(ratio, packing.enclosing_diameter_ratio(19))
         self.assertTrue(math.isfinite(ratio))
 
+    def test_ratio_does_not_jump_at_table_boundary(self):
+        # Regression test: the large-N fallback formula once had a spurious factor of 2,
+        # which didn't break monotonicity (still an increase) but made the ratio roughly
+        # double between count=19 (from the table) and count=20 (from the formula) --
+        # reported as "tube diameter jumps significantly at >=20 bits". Consecutive counts
+        # should differ by roughly sqrt((n+1)/n), not by a large discontinuous jump.
+        for n in range(15, 30):
+            a = packing.enclosing_diameter_ratio(n)
+            b = packing.enclosing_diameter_ratio(n + 1)
+            self.assertLess(b / a, 1.15,
+                             "ratio jumped by {:.1f}% from count={} to count={}".format(
+                                 (b / a - 1) * 100, n, n + 1))
+
+    def test_ratio_close_to_asymptotic_prediction(self):
+        # sqrt(N/density) is the leading-order asymptotic behavior; the real ratio
+        # (table or formula) should track it within a modest constant factor, not be
+        # off by ~2x the way the spurious-factor-of-2 bug made large-N counts come out.
+        density = math.pi / (2 * math.sqrt(3))
+        for n in (19, 20, 25, 50, 100):
+            ratio = packing.enclosing_diameter_ratio(n)
+            predicted = math.sqrt(n / density)
+            self.assertLess(ratio / predicted, 1.3)
+            self.assertGreater(ratio / predicted, 0.8)
+
     def test_bore_diameter_single_bit(self):
         self.assertAlmostEqual(packing.bore_diameter(6.0, 1, clearance=0.0), 6.0)
 
